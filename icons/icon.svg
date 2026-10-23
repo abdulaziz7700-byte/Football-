@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+ <clipPath id="ball"><circle cx="236" cy="276" r="150"/></clipPath>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1F4C86"/><stop offset="1" stop-color="#112C52"/></linearGradient>
+ <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5CF6B"/><stop offset="1" stop-color="#D99A22"/></linearGradient>
+ <radialGradient id="shade" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset=".6" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="1" stop-color="#8B6F45" stop-opacity=".35"/></radialGradient>
+</defs>
+<rect width="512" height="512" rx="112" fill="url(#bg)"/>
+<g fill="none" stroke="#3E6EA8" stroke-width="6" opacity=".55">
+ <circle cx="256" cy="256" r="196"/><line x1="0" y1="256" x2="512" y2="256"/>
+</g>
+<ellipse cx="246" cy="448" rx="120" ry="16" fill="#0B1F3B" opacity=".5"/>
+<circle cx="236" cy="276" r="150" fill="#F2E8D5"/>
+<g clip-path="url(#ball)">
+ <g fill="#173B6C"><polygon points="304.2,182.2 285.3,124.0 334.7,88.1 384.2,124.0 365.3,182.2"/><polygon points="346.3,311.8 395.8,275.9 445.2,311.8 426.3,370.0 365.2,370.0"/><polygon points="236.0,392.0 285.5,427.9 266.6,486.1 205.4,486.1 186.5,427.9"/><polygon points="125.7,311.8 106.8,370.0 45.7,370.0 26.8,311.8 76.2,275.9"/><polygon points="167.8,182.2 106.7,182.2 87.8,124.0 137.3,88.1 186.7,124.0"/><polygon points="236.0,230.0 279.7,261.8 263.0,313.2 209.0,313.2 192.3,261.8"/></g>
+ <g stroke="#173B6C" stroke-width="7" stroke-linecap="round"><line x1="236.0" y1="230.0" x2="236.0" y2="129.0"/><line x1="279.7" y1="261.8" x2="375.8" y2="230.6"/><line x1="263.0" y1="313.2" x2="322.4" y2="394.9"/><line x1="209.0" y1="313.2" x2="149.6" y2="394.9"/><line x1="192.3" y1="261.8" x2="96.2" y2="230.6"/></g>
+ <circle cx="236" cy="276" r="150" fill="url(#shade)"/>
+</g>
+<circle cx="236" cy="276" r="150" fill="none" stroke="#0E2445" stroke-width="8"/>
+<path d="M352 40 L250 238 L314 238 L196 470 L420 196 L340 196 L428 40 Z" fill="url(#bolt)" stroke="#0E2445" stroke-width="16" stroke-linejoin="round" paint-order="stroke"/>
+<g stroke="#F5CF6B" stroke-width="12" stroke-linecap="round">
+ <line x1="448" y1="250" x2="476" y2="238"/><line x1="440" y1="290" x2="470" y2="300"/><line x1="96" y1="96" x2="118" y2="118"/>
+</g>
+</svg>
