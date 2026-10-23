@@ -1,24 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
 <defs>
- <clipPath id="ball"><circle cx="236" cy="276" r="150"/></clipPath>
- <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1F4C86"/><stop offset="1" stop-color="#112C52"/></linearGradient>
- <linearGradient id="bolt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F5CF6B"/><stop offset="1" stop-color="#D99A22"/></linearGradient>
- <radialGradient id="shade" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset=".6" stop-color="#FFFFFF" stop-opacity="0"/><stop offset="1" stop-color="#8B6F45" stop-opacity=".35"/></radialGradient>
+ <clipPath id="ball"><circle cx="256" cy="262" r="168"/></clipPath>
+ <clipPath id="L"><polygon points="0,0 300,0 300,94 226,268 292,268 212,430 212,512 0,512"/></clipPath>
+ <clipPath id="R"><polygon points="300,0 512,0 512,512 212,512 212,430 292,268 226,268 300,94"/></clipPath>
 </defs>
-<rect width="512" height="512" rx="112" fill="url(#bg)"/>
-<g fill="none" stroke="#3E6EA8" stroke-width="6" opacity=".55">
- <circle cx="256" cy="256" r="196"/><line x1="0" y1="256" x2="512" y2="256"/>
-</g>
-<ellipse cx="246" cy="448" rx="120" ry="16" fill="#0B1F3B" opacity=".5"/>
-<circle cx="236" cy="276" r="150" fill="#F2E8D5"/>
-<g clip-path="url(#ball)">
- <g fill="#173B6C"><polygon points="304.2,182.2 285.3,124.0 334.7,88.1 384.2,124.0 365.3,182.2"/><polygon points="346.3,311.8 395.8,275.9 445.2,311.8 426.3,370.0 365.2,370.0"/><polygon points="236.0,392.0 285.5,427.9 266.6,486.1 205.4,486.1 186.5,427.9"/><polygon points="125.7,311.8 106.8,370.0 45.7,370.0 26.8,311.8 76.2,275.9"/><polygon points="167.8,182.2 106.7,182.2 87.8,124.0 137.3,88.1 186.7,124.0"/><polygon points="236.0,230.0 279.7,261.8 263.0,313.2 209.0,313.2 192.3,261.8"/></g>
- <g stroke="#173B6C" stroke-width="7" stroke-linecap="round"><line x1="236.0" y1="230.0" x2="236.0" y2="129.0"/><line x1="279.7" y1="261.8" x2="375.8" y2="230.6"/><line x1="263.0" y1="313.2" x2="322.4" y2="394.9"/><line x1="209.0" y1="313.2" x2="149.6" y2="394.9"/><line x1="192.3" y1="261.8" x2="96.2" y2="230.6"/></g>
- <circle cx="236" cy="276" r="150" fill="url(#shade)"/>
-</g>
-<circle cx="236" cy="276" r="150" fill="none" stroke="#0E2445" stroke-width="8"/>
-<path d="M352 40 L250 238 L314 238 L196 470 L420 196 L340 196 L428 40 Z" fill="url(#bolt)" stroke="#0E2445" stroke-width="16" stroke-linejoin="round" paint-order="stroke"/>
-<g stroke="#F5CF6B" stroke-width="12" stroke-linecap="round">
- <line x1="448" y1="250" x2="476" y2="238"/><line x1="440" y1="290" x2="470" y2="300"/><line x1="96" y1="96" x2="118" y2="118"/>
-</g>
+<rect width="512" height="512" rx="112" fill="#F2E8D5"/>
+<ellipse cx="256" cy="452" rx="124" ry="13" fill="#DECDAB"/>
+<g transform="translate(-10 0)" clip-path="url(#L)"><g clip-path="url(#ball)">
+ <circle cx="256" cy="262" r="168" fill="#FFFCF5"/><g fill="#173B6C"><polygon points="256.0,216.0 299.7,247.8 283.0,299.2 229.0,299.2 212.3,247.8"/><polygon points="331.2,158.4 310.9,95.8 364.2,57.1 417.4,95.8 397.1,158.4"/><polygon points="377.7,301.6 431.0,262.9 484.3,301.6 463.9,364.2 398.1,364.2"/><polygon points="256.0,390.0 309.3,428.7 288.9,491.3 223.1,491.3 202.7,428.7"/><polygon points="134.3,301.6 113.9,364.2 48.1,364.2 27.7,301.6 81.0,262.9"/><polygon points="180.8,158.4 114.9,158.4 94.6,95.8 147.8,57.1 201.1,95.8"/></g><g stroke="#173B6C" stroke-width="7" stroke-linecap="round"><line x1="256.0" y1="216.0" x2="256.0" y2="94.0"/><line x1="299.7" y1="247.8" x2="415.8" y2="210.1"/><line x1="283.0" y1="299.2" x2="354.7" y2="397.9"/><line x1="229.0" y1="299.2" x2="157.3" y2="397.9"/><line x1="212.3" y1="247.8" x2="96.2" y2="210.1"/></g></g>
+ <circle cx="256" cy="262" r="163" fill="none" stroke="#173B6C" stroke-width="10"/></g>
+<g transform="translate(10 0)" clip-path="url(#R)"><g clip-path="url(#ball)">
+ <circle cx="256" cy="262" r="168" fill="#FFFCF5"/><g fill="#2F6DB5"><polygon points="256.0,216.0 299.7,247.8 283.0,299.2 229.0,299.2 212.3,247.8"/><polygon points="331.2,158.4 310.9,95.8 364.2,57.1 417.4,95.8 397.1,158.4"/><polygon points="377.7,301.6 431.0,262.9 484.3,301.6 463.9,364.2 398.1,364.2"/><polygon points="256.0,390.0 309.3,428.7 288.9,491.3 223.1,491.3 202.7,428.7"/><polygon points="134.3,301.6 113.9,364.2 48.1,364.2 27.7,301.6 81.0,262.9"/><polygon points="180.8,158.4 114.9,158.4 94.6,95.8 147.8,57.1 201.1,95.8"/></g><g stroke="#2F6DB5" stroke-width="7" stroke-linecap="round"><line x1="256.0" y1="216.0" x2="256.0" y2="94.0"/><line x1="299.7" y1="247.8" x2="415.8" y2="210.1"/><line x1="283.0" y1="299.2" x2="354.7" y2="397.9"/><line x1="229.0" y1="299.2" x2="157.3" y2="397.9"/><line x1="212.3" y1="247.8" x2="96.2" y2="210.1"/></g></g>
+ <circle cx="256" cy="262" r="163" fill="none" stroke="#2F6DB5" stroke-width="10"/></g>
+<polyline points="328,36 300,94 226,268 292,268 212,430 184,480" fill="none" stroke="#F2E8D5" stroke-width="40" stroke-linejoin="miter" stroke-miterlimit="10"/>
+<polyline points="328,36 300,94 226,268 292,268 212,430 184,480" fill="none" stroke="#D9A23A" stroke-width="20" stroke-linejoin="miter" stroke-miterlimit="10" stroke-linecap="round"/>
 </svg>
