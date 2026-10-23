@@ -3,6 +3,7 @@ import { createStore, isOnline } from "./store.js";
 // Squad shape for each training: 18 open field slots + 2 goalkeepers + 3 slots the admin fills from the reserves = 23.
 const OPEN = 18, GK = 2, HELD = 3, MAIN = OPEN + GK + HELD, BATCH = 5, MIN_MATCHES = 3;
 const TEAM_FIELD = { A: 11, B: 10 };
+const REMIND_HOURS = 4;
 const $ = s => document.querySelector(s);
 const root = $("#root");
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -26,6 +27,9 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")
 const todayStr = () => ymd(new Date());
 const daysTo = s => Math.round((parseDate(s) - parseDate(todayStr())) / 864e5);
 const sortKey = t => t.date + " " + t.time;
+const startOf = t => { const d = parseDate(t.date); const [h, m] = t.time.split(":").map(Number); d.setHours(h, m); return d; };
+const hoursTo = t => (startOf(t) - Date.now()) / 36e5;
+const icsStamp = d => `${ymd(d).replace(/-/g, "")}T${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}00`;
 
 // ---------- state ----------
 const D = { trainings: [], settings: undefined };
@@ -173,6 +177,19 @@ const A = {
     (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast("انسخ النص"), () => toast("ما قدرت أنسخ، انسخه يدوياً"));
   },
 };
+A.remind = () => {
+  const t = current(), start = startOf(t), end = new Date(+start + 2 * 36e5);
+  const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//kora//ar", "BEGIN:VEVENT",
+    `UID:${t.id}@kora`, `DTSTAMP:${icsStamp(new Date())}`, `DTSTART:${icsStamp(start)}`, `DTEND:${icsStamp(end)}`,
+    `SUMMARY:⚽ ${D.settings.name}`, `LOCATION:${t.place}`, `DESCRIPTION:${location.origin + location.pathname}`,
+    "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:التمرين بعد ${REMIND_HOURS} ساعات`, `TRIGGER:-PT${REMIND_HOURS}H`, "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([ics], { type: "text/calendar;charset=utf-8" }));
+  a.download = `tamreen-${t.date}.ics`;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast("افتح الملف واضغط إضافة للتقويم");
+};
 A.sort = el => { U.sortK = el.dataset.k; render(); };
 
 async function saveMe(name) {
@@ -258,8 +275,9 @@ function header() {
   let next = "";
   if (t) {
     const d = daysTo(t.date);
-    const big = d < 0 ? "✓" : d === 0 ? "اليوم" : d === 1 ? "بكرة" : d;
-    const sub = d < 0 ? "التمرين انتهى" : d <= 1 ? "التمرين" : "أيام على التمرين";
+    const h = hoursTo(t), soon = d === 0 && h > 0 && h <= 12;
+    const big = d < 0 || (d === 0 && h <= -2) ? "✓" : soon ? Math.ceil(h) : d === 0 ? "اليوم" : d === 1 ? "بكرة" : d;
+    const sub = big === "✓" ? "التمرين انتهى" : soon ? (Math.ceil(h) <= 2 ? "ساعة على التمرين" : "ساعات على التمرين") : d <= 1 ? "التمرين" : "أيام على التمرين";
     next = `<div class="next"><span class="big">${big}</span><div class="txt"><b>${longDate(t.date)}</b>${sub} · ${t12(t.time)} · ${esc(t.place)}</div></div>`;
   }
   return `<header class="top"><div class="wrap"><div class="hrow"><img src="icons/icon-192.png" alt="">
@@ -299,7 +317,8 @@ function myStatus(t) {
   else if (p.status === "in") { num = "🧤"; title = "أنت حارس التمرين"; sub = "خانة حارس ثابتة"; }
   else if (p.status === "held") { num = svg(ic.lock, 'style="width:24px;height:24px"'); title = "أنت في خانة محجوزة"; sub = "المشرف اختارك للأساسيين"; }
   else { num = reserves(t).indexOf(p) + 1; title = "أنت في الاحتياط"; sub = `ترتيبك ${num}، وتدخل أول ما تفضى خانة${p.role === "gk" ? " حارس" : ""}`; cls = "wait"; }
-  return `<div class="mine ${cls}"><span class="num">${num}</span><div class="t"><b>${title}</b>${sub}</div>${past ? "" : `<button class="btn small danger" data-act="leave" data-n="${esc(p.name)}">انسحاب</button>`}</div>`;
+  return `<div class="mine ${cls}"><span class="num">${num}</span><div class="t"><b>${title}</b>${sub}</div>${past ? "" : `<button class="btn small danger" data-act="leave" data-n="${esc(p.name)}">انسحاب</button>`}</div>
+    ${hoursTo(t) > REMIND_HOURS ? `<button class="btn ghost" data-act="remind">⏰ ذكّرني قبل التمرين بـ${REMIND_HOURS} ساعات</button>` : ""}`;
 }
 
 function slot({ no, name, cls = "", x = "", extra = "" }) {
@@ -342,7 +361,7 @@ function regView() {
       <datalist id="roster-list">${roster().map(r => `<option value="${esc(r.name)}">`).join("")}</datalist></form>` : ""}
     <div class="btns"><a class="btn wa" href="https://wa.me/?text=${encodeURIComponent(shareText)}" target="_blank" rel="noopener">أرسل القائمة للواتساب</a>
       <button class="btn ghost" data-act="copy" data-text="${esc(shareText)}">نسخ</button></div>
-    ${feeCard(t)}`;
+    ${groupReminder(t)}${feeCard(t)}`;
 }
 function emptySquad() {
   return `<section class="card" style="opacity:.75"><div class="sec-h"><h2>الأساسيين</h2><span class="cnt"><b>0</b> / ${MAIN}</span></div>
@@ -350,6 +369,15 @@ function emptySquad() {
     <div class="slots">${slot({ no: svg(ic.glove), cls: "gk", extra: "خانة حارس" }).repeat(2)}${`<div class="slot held open"><span class="no">${svg(ic.lock)}</span><span class="nm">محجوزة</span></div>`.repeat(3)}${Array.from({ length: OPEN }, (_, i) => slot({ no: i + 1 })).join("")}</div></section>`;
 }
 
+function groupReminder(t) {
+  const h = hoursTo(t);
+  if (!isAdmin() || h <= 0) return "";
+  const due = h <= REMIND_HOURS + 0.5;
+  const text = `⏰ تذكير: ${D.settings.name}\nالتمرين ${daysTo(t.date) === 0 ? "اليوم" : longDate(t.date)} الساعة ${t12(t.time)} · ${t.place}\n\nالأساسيين:\n${mainSquad(t).map((p, i) => `${i + 1}. ${p.role === "gk" ? "🧤 " : ""}${p.name}`).join("\n")}\n\nاللي ما يقدر يجي ينسحب من هنا عشان يدخل الاحتياط: ${location.origin + location.pathname}`;
+  return `<div class="card" style="${due ? "border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)" : ""}"><div class="row"><h3>⏰ تذكير القروب</h3>${due ? '<span class="chip gold">وقته الحين</span>' : `<span class="chip">قبل التمرين بـ${REMIND_HOURS} ساعات</span>`}</div>
+    <p class="hint">${due ? "باقي أقل من " + REMIND_HOURS + " ساعات. أرسل التذكير للقروب." : `يتفعّل هذا التذكير الساعة ${t12(new Date(+startOf(t) - REMIND_HOURS * 36e5).toTimeString().slice(0, 5))}، ورسالته جاهزة فيها أسماء الأساسيين.`}</p>
+    <a class="btn wa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">أرسل التذكير للواتساب</a></div>`;
+}
 function feeCard(t) {
   const fee = t.fee || { total: 0, paid: [] }, people = mainSquad(t);
   if (!isAdmin() && !fee.total) return "";
