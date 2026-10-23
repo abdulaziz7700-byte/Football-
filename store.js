@@ -15,6 +15,7 @@ export async function createStore() {
 //   updateTraining(id, fn)   fn(copy) mutates the training; runs atomically
 //   deleteTraining(id)
 //   saveSettings(s)
+//   updateSettings(fn)       fn(copy) mutates the settings; runs atomically
 
 async function firebaseStore() {
   const { initializeApp } = await import(`${SDK}/firebase-app.js`);
@@ -45,6 +46,14 @@ async function firebaseStore() {
     },
     async deleteTraining(id) { await fs.deleteDoc(fs.doc(db, "trainings", id)); },
     async saveSettings(s) { await fs.setDoc(settingsRef, s); },
+    async updateSettings(fn) {
+      await fs.runTransaction(db, async tx => {
+        const snap = await tx.get(settingsRef);
+        const s = snap.exists() ? snap.data() : {};
+        fn(s);
+        tx.set(settingsRef, s);
+      });
+    },
   };
 }
 
@@ -65,5 +74,6 @@ function localStore() {
     },
     async deleteTraining(id) { const d = read(); d.trainings = d.trainings.filter(t => t.id !== id); write(d); },
     async saveSettings(s) { const d = read(); d.settings = s; write(d); },
+    async updateSettings(fn) { const d = read(); d.settings = d.settings || {}; fn(d.settings); write(d); },
   };
 }
