@@ -2,7 +2,7 @@ import { createStore, isOnline } from "./store.js";
 
 // Squad shape for each training: 18 open field slots + 2 goalkeepers + 3 slots the admin fills from the reserves = 23.
 const OPEN = 18, GK = 2, HELD = 3, MAIN = OPEN + GK + HELD, BATCH = 5, MIN_MATCHES = 3;
-const TEAM_FIELD = { A: 11, B: 10 };
+const SIZES = [8, 9], DEFAULT_SIZE = 8; // players per team on the pitch, goalkeeper included
 const REMIND_HOURS = 4;
 const $ = s => document.querySelector(s);
 const root = $("#root");
@@ -145,8 +145,10 @@ const A = {
     else {
       const t = current(), x = U.sel;
       if ((roleOf(t, x) === "gk") !== (roleOf(t, n) === "gk")) toast("بدّل حارس بحارس، ولاعب بلاعب");
-      else if (T.A.includes(x) === T.A.includes(n)) toast("اختر لاعب من كل فريق");
-      else { const [a, b] = T.A.includes(x) ? [x, n] : [n, x]; T.A[T.A.indexOf(a)] = b; T.B[T.B.indexOf(b)] = a; }
+      else {
+        const tx = T.A.includes(x) ? T.A : T.B, tn = T.A.includes(n) ? T.A : T.B, ix = tx.indexOf(x), inn = tn.indexOf(n);
+        tx[ix] = n; tn[inn] = x;
+      }
       U.sel = null;
     }
     render();
@@ -189,6 +191,10 @@ A.remind = () => {
   a.download = `tamreen-${t.date}.ics`;
   document.body.appendChild(a); a.click(); a.remove();
   toast("افتح الملف واضغط إضافة للتقويم");
+};
+A.size = el => {
+  const t = current(), size = +el.dataset.v;
+  act(() => store.updateTraining(t.id, t => { t.size = size; }), `صارت ${size} ضد ${size}`);
 };
 A.sort = el => { U.sortK = el.dataset.k; render(); };
 
@@ -285,8 +291,8 @@ function header() {
     ${isOnline() ? "" : '<span class="mode" title="البيانات محفوظة في هذا المتصفح بس">وضع التجربة</span>'}</div>${next}</div></header>`;
 }
 function shell(body) {
-  return `${header()}<main class="screen wrap">${body}</main>
-    <nav class="tabs" role="tablist"><div class="in">${tabs.map(([k, l]) => `<button role="tab" data-act="tab" data-v="${k}" aria-selected="${U.tab === k}"><span class="pill">${svg(ic[k])}</span>${l}</button>`).join("")}</div></nav>`;
+  return `${header()}<nav class="tabs" role="tablist"><div class="in">${tabs.map(([k, l]) => `<button role="tab" data-act="tab" data-v="${k}" aria-selected="${U.tab === k}"><span class="pill">${svg(ic[k])}</span>${l}</button>`).join("")}</div></nav>
+    <main class="screen wrap">${body}</main>`;
 }
 
 function newTrainingForm() {
@@ -396,21 +402,41 @@ function spots(n, bottom) {
   });
   return out;
 }
+const sizeOf = t => (t && t.size) || DEFAULT_SIZE;
+// first goalkeeper and the first (size - 1) field players start; everyone else in the team is on the bench
+function split(t, names) {
+  const size = sizeOf(t), gk = t ? names.filter(n => roleOf(t, n) === "gk") : [], field = t ? names.filter(n => roleOf(t, n) !== "gk") : [];
+  return { gk: gk[0], field: field.slice(0, size - 1), bench: [...gk.slice(1), ...field.slice(size - 1)] };
+}
 function pitch(t, T, S, admin) {
   const team = (names, side) => {
-    const gk = t ? names.filter(n => roleOf(t, n) === "gk") : [], field = t ? names.filter(n => roleOf(t, n) !== "gk") : [];
-    const full = t && mainSquad(t).filter(p => p.role !== "gk").length >= TEAM_FIELD.A + TEAM_FIELD.B;
-    const cap = full ? field.length : Math.max(TEAM_FIELD[side], field.length), pos = spots(cap, side === "A");
+    const { gk, field } = split(t, names);
+    const cap = sizeOf(t) - 1, pos = spots(cap, side === "A");
     const btn = (n, x, y, isGk) => n
       ? `<button class="pl ${side}${isGk ? " gk" : ""}${U.sel === n ? " sel" : ""}" style="right:${x}%;top:${y}%" data-act="pick" data-n="${esc(n)}" ${admin ? "" : "disabled"} title="مستوى ${rating(S, n)}%"><span class="dot">${rating(S, n)}</span><span class="nm">${esc(n)}</span></button>`
       : `<span class="pl empty${isGk ? " gk" : ""}" style="right:${x}%;top:${y}%"><span class="dot">${isGk ? "🧤" : "+"}</span><span class="nm">${isGk ? "حارس" : "فاضي"}</span></span>`;
     const gy = side === "A" ? 92 : 8;
-    return btn(gk[0], 50, gy, true) + Array.from({ length: cap }, (_, i) => btn(field[i], pos[i][0], pos[i][1], false)).join("");
+    return btn(gk, 50, gy, true) + Array.from({ length: cap }, (_, i) => btn(field[i], pos[i][0], pos[i][1], false)).join("");
   };
   return `<div class="pitch"><div class="circle"></div><div class="box t"></div><div class="box b"></div>
     <span class="tlabel" style="top:18px">البيج</span><span class="tlabel" style="bottom:18px">الأزرق</span>${team(T.A, "A")}${team(T.B, "B")}</div>`;
 }
 
+function sizeBar(t, admin) {
+  const size = sizeOf(t);
+  if (!admin || !t) return `<div class="row"><span class="chip blue">${size} ضد ${size}</span><span class="hint">كل فريق ${size} لاعبين مع الحارس</span></div>`;
+  return `<div class="role" role="radiogroup" aria-label="عدد اللاعبين">${SIZES.map(n => `<button type="button" role="radio" data-act="size" data-v="${n}" aria-checked="${size === n}">${n} ضد ${n}</button>`).join("")}</div>`;
+}
+function bench(t, T, admin) {
+  if (!t) return "";
+  const col = (names, side, label) => {
+    const b = split(t, names).bench;
+    return `<div class="card" style="padding:12px;gap:8px;flex:1;min-width:0"><span class="label">${label} · ${b.length}</span>${b.length
+      ? `<div class="scorers">${b.map(n => `<button data-act="pick" data-n="${esc(n)}" class="${U.sel === n ? "on" : ""}" ${admin ? "" : "disabled"}>${roleOf(t, n) === "gk" ? "🧤 " : ""}${esc(n)}</button>`).join("")}</div>`
+      : '<span class="hint">ما فيه</span>'}</div>`;
+  };
+  return `<div class="row" style="align-items:stretch;flex-wrap:nowrap">${col(T.A, "A", "🔵 دكة الأزرق")}${col(T.B, "B", "🟤 دكة البيج")}</div>`;
+}
 function lineView() {
   const t = current(), S = computeStats(), admin = isAdmin();
   if (!t) return `<h2>التشكيلة</h2>${pitch(null, { A: [], B: [] }, S, false)}<p class="hint">الملعب يتعبّى أول ما يسجّل الشباب في تمرين.</p>`;
@@ -421,13 +447,16 @@ function lineView() {
   const reg = new Set(mainSquad(t).map(p => p.name));
   const stale = t.teams && ([...t.teams.A, ...t.teams.B].some(n => !reg.has(n)) || reg.size !== t.teams.A.length + t.teams.B.length);
   const avg = names => { const f = names.filter(n => roleOf(t, n) !== "gk"); return f.length ? Math.round(f.reduce((s, n) => s + rating(S, n), 0) / f.length) + "%" : "—"; };
-  const teamText = `تشكيلة تمرين ${longDate(t.date)}\n\n🔵 الأزرق:\n${T.A.map(n => (roleOf(t, n) === "gk" ? "🧤 " : "• ") + n).join("\n")}\n\n🟤 البيج:\n${T.B.map(n => (roleOf(t, n) === "gk" ? "🧤 " : "• ") + n).join("\n")}`;
+  const teamLines = names => { const s = split(t, names); return [s.gk && "🧤 " + s.gk, ...s.field.map(n => "• " + n)].filter(Boolean).join("\n") + (s.bench.length ? `\nدكة: ${s.bench.join("، ")}` : ""); };
+  const teamText = `تشكيلة تمرين ${longDate(t.date)} · ${sizeOf(t)} ضد ${sizeOf(t)}\n\n🔵 الأزرق:\n${teamLines(T.A)}\n\n🟤 البيج:\n${teamLines(T.B)}`;
   return `<div class="row"><h2>التشكيلة</h2>${admin ? `<button class="btn small" data-act="shuffle">⚖️ توزيع متوازن</button>` : t.teams ? '<span class="chip blue">معتمدة من المشرف</span>' : '<span class="chip">مقترحة تلقائياً</span>'}</div>
     ${stale ? `<p class="hint" style="color:var(--loss)">تغيّرت قائمة الأساسيين بعد حفظ التشكيلة.${admin ? " اضغط توزيع متوازن واحفظها من جديد." : ""}</p>` : ""}
     <div class="balance"><div class="side"><span class="label">🔵 الأزرق · ${T.A.length}</span><b>${avg(T.A)}</b><span class="hint">متوسط المستوى</span></div><span class="vs">ضد</span>
       <div class="side"><span class="label">البيج 🟤 · ${T.B.length}</span><b>${avg(T.B)}</b><span class="hint">متوسط المستوى</span></div></div>
+    ${sizeBar(t, admin)}
     ${pitch(t, T, S, admin)}
-    <p class="hint">الرقم داخل الدائرة مستوى اللاعب، والجديد يبدأ من 50. الحارس بإطار ذهبي.${admin ? " اضغط لاعبين من فريقين عشان تبدّلهم، وبعدها احفظ." : ""}</p>
+    ${bench(t, T, admin)}
+    <p class="hint">الرقم داخل الدائرة مستوى اللاعب، والجديد يبدأ من 50. الحارس بإطار ذهبي.${admin ? " اضغط على لاعبين عشان تبدّل مكانهم (بين الفريقين أو بين الملعب والدكة)، وبعدها احفظ." : ""}</p>
     <div class="btns">${admin ? `<button class="btn" data-act="saveTeams">حفظ التشكيلة</button>` : ""}
       <a class="btn wa" href="https://wa.me/?text=${encodeURIComponent(teamText)}" target="_blank" rel="noopener">أرسل للواتساب</a>
       <button class="btn ghost" data-act="copy" data-text="${esc(teamText)}">نسخ</button></div>
