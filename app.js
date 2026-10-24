@@ -42,6 +42,11 @@ let store;
 const unlocked = () => D.settings && ls.get("kora.group") === D.settings.groupHash;
 const isAdmin = () => D.settings && ls.get("kora.admin") === D.settings.adminHash;
 const roster = () => (D.settings && D.settings.roster) || [];
+const payInfo = () => (D.settings && D.settings.pay) || {};
+// fee per training: paid = confirmed by the admin, claimed = the player says they transferred and waits for the admin
+const feeOf = t => ({ total: 0, per: 0, mode: "total", paid: [], claimed: [], ...(t.fee || {}) });
+const perHead = t => { const f = feeOf(t), n = mainSquad(t).length; return f.mode === "per" ? f.per : n ? Math.ceil(f.total / n) : 0; };
+const safeUrl = u => /^https:\/\/\S+$/i.test(u || "") ? u : "";
 
 function sorted() { return [...D.trainings].sort((a, b) => sortKey(b).localeCompare(sortKey(a))); }
 function current() {
@@ -162,9 +167,24 @@ const A = {
     const t = current(), n = el.dataset.n, me = U.me;
     act(() => store.updateTraining(t.id, t => { t.votes = t.votes || {}; if (t.votes[me]) throw new Error("صوّتت من قبل"); t.votes[me] = n; }), "انحسب صوتك");
   },
+  // admin: unpaid or waiting -> confirmed, confirmed -> unpaid
   paid(el) {
-    const t = current(), n = el.dataset.n;
-    act(() => store.updateTraining(t.id, t => { t.fee = t.fee || { total: 0, paid: [] }; const p = new Set(t.fee.paid); p.has(n) ? p.delete(n) : p.add(n); t.fee.paid = [...p]; }));
+    const t = current(), n = el.dataset.n; let on;
+    act(async () => { await store.updateTraining(t.id, t => {
+      const f = t.fee = feeOf(t); on = !f.paid.includes(n);
+      f.paid = on ? [...f.paid, n] : f.paid.filter(x => x !== n);
+      f.claimed = f.claimed.filter(x => x !== n);
+    }); toast(on ? `تأكد دفع ${n}` : `${n} رجع ما دفع`); });
+  },
+  // player: "I paid" / undo while the admin has not confirmed yet
+  claim() {
+    const t = current(), n = U.me; let on;
+    act(async () => { await store.updateTraining(t.id, t => {
+      const f = t.fee = feeOf(t);
+      if (f.paid.includes(n)) throw new Error("المشرف أكّد دفعك من قبل");
+      on = !f.claimed.includes(n);
+      f.claimed = on ? [...f.claimed, n] : f.claimed.filter(x => x !== n);
+    }); toast(on ? "وصل، ننتظر المشرف يأكد التحويل 👍" : "انلغى"); });
   },
   view(el) { U.viewId = el.dataset.id; U.draftTeams = null; U.draftResult = null; U.tab = "reg"; render(); window.scrollTo(0, 0); },
   delTraining() {
@@ -233,7 +253,7 @@ const F = {
   hello(f) { saveMe(f.existing?.value || f.name.value); },
   me(f) { saveMe(f.me.value); },
   async newTraining(f) {
-    const t = { date: f.date.value, time: f.time.value, place: f.place.value.trim() || "الملعب", createdAt: Date.now(), players: [], teams: null, result: null, votes: {}, fee: { total: 0, paid: [] } };
+    const t = { date: f.date.value, time: f.time.value, place: f.place.value.trim() || "الملعب", createdAt: Date.now(), players: [], teams: null, result: null, votes: {}, fee: { total: 0, per: 0, mode: "total", paid: [], claimed: [] } };
     if (!t.date || !t.time) return toast("اختر التاريخ والوقت");
     await act(async () => { U.viewId = await store.addTraining(t); U.newOpen = false; U.draftTeams = null; U.draftResult = null; }, "انفتح التسجيل للتمرين الجديد");
     render();
@@ -252,8 +272,14 @@ const F = {
     }), `${n} دخل الخانة المحجوزة`);
   },
   fee(f) {
-    const t = current(), total = Math.max(0, Number(f.total.value) || 0);
-    act(() => store.updateTraining(t.id, t => { t.fee = { ...(t.fee || { paid: [] }), total }; }), "انحفظ المبلغ");
+    const t = current(), mode = U.feeMode || feeOf(t).mode, v = Math.max(0, Math.round(Number(f.amount.value) || 0));
+    act(() => store.updateTraining(t.id, t => { t.fee = { ...feeOf(t), mode, [mode === "per" ? "per" : "total"]: v, [mode === "per" ? "total" : "per"]: 0 }; }), "انحفظ مبلغ القطة");
+  },
+  pay(f) {
+    const link = f.link.value.trim();
+    if (link && !safeUrl(link)) return toast("الرابط لازم يبدأ بـ https://");
+    const pay = { holder: f.holder.value.trim(), bank: f.bank.value.trim(), iban: f.iban.value.replace(/\s+/g, "").toUpperCase(), stc: f.stc.value.replace(/[^\d+]/g, ""), link };
+    act(() => store.updateSettings(s => { s.pay = pay; }), "انحفظت طريقة الدفع");
   },
   async admin(f) {
     if (await sha(f.code.value) === D.settings.adminHash) { ls.set("kora.admin", D.settings.adminHash); toast("دخلت كمشرف"); render(); }
@@ -396,12 +422,37 @@ function groupReminder(t) {
     <a class="btn wa" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">أرسل التذكير للواتساب</a></div>`;
 }
 function feeCard(t) {
-  const fee = t.fee || { total: 0, paid: [] }, people = mainSquad(t);
-  if (!isAdmin() && !fee.total) return "";
-  const per = people.length ? Math.ceil(fee.total / people.length) : 0;
-  return `<div class="card"><div class="row"><h3>رسوم الملعب</h3>${fee.total ? `<span class="chip blue">${per} ريال على الشخص</span>` : ""}</div>
-    ${isAdmin() ? `<form data-form="fee" class="joinrow"><input id="fee-total" name="total" type="number" min="0" inputmode="numeric" placeholder="إيجار الملعب بالريال" value="${fee.total || ""}"><button class="btn small" type="submit">حفظ</button></form>` : `<p class="hint">الإيجار ${fee.total} ريال مقسوم على ${people.length} من الأساسيين.</p>`}
-    ${fee.total ? `<p class="hint">دفع ${fee.paid.filter(n => people.some(p => p.name === n)).length} من ${people.length}</p><ol class="plain">${people.map(p => { const on = fee.paid.includes(p.name); return `<li>${esc(p.name)}${isAdmin() ? `<button class="paid ${on ? "on" : ""}" data-act="paid" data-n="${esc(p.name)}">${on ? "دفع" : "ما دفع"}</button>` : `<span class="chip ${on ? "win" : ""}" style="margin-inline-start:auto">${on ? "دفع" : "باقي"}</span>`}</li>`; }).join("")}</ol>` : ""}</div>`;
+  const f = feeOf(t), people = mainSquad(t), admin = isAdmin(), per = perHead(t), pay = payInfo();
+  const set = f.mode === "per" ? f.per > 0 : f.total > 0;
+  if (!admin && !set) return "";
+  const mode = U.feeMode || f.mode, inSquad = people.some(p => p.name === U.me);
+  const status = n => f.paid.includes(n) ? "paid" : f.claimed.includes(n) ? "claimed" : "no";
+  const paidN = people.filter(p => status(p.name) === "paid").length, waitN = people.filter(p => status(p.name) === "claimed").length;
+  const owed = people.filter(p => status(p.name) !== "paid");
+  const hasPay = pay.iban || pay.stc || pay.link;
+  const copyRow = (label, v) => v ? `<div class="payrow"><span class="label">${label}</span><b dir="ltr">${esc(v)}</b><button class="btn small ghost" data-act="copy" data-text="${esc(v)}">نسخ</button></div>` : "";
+  const payBox = hasPay ? `<div class="paybox">${pay.holder ? `<div class="payrow"><span class="label">باسم</span><b>${esc(pay.holder)}</b></div>` : ""}
+      ${copyRow(pay.bank ? "آيبان · " + esc(pay.bank) : "آيبان", pay.iban)}${copyRow("STC Pay", pay.stc)}
+      ${safeUrl(pay.link) ? `<a class="btn" href="${esc(pay.link)}" target="_blank" rel="noopener">ادفع من الرابط</a>` : ""}</div>`
+    : admin ? `<p class="hint">ما حطيت بيانات التحويل للحين. حطها من تبويب <b>المزيد</b> عشان تطلع للشباب هنا.</p>` : "";
+  const me = status(U.me);
+  const mine = inSquad && set ? (me === "paid" ? `<div class="mine"><span class="num">✓</span><div class="t"><b>دفعت قطتك</b>المشرف أكّد التحويل، شكراً</div></div>`
+    : me === "claimed" ? `<div class="mine wait"><span class="num">⏳</span><div class="t"><b>بانتظار تأكيد المشرف</b>قلت إنك حوّلت ${per} ريال</div><button class="btn small ghost" data-act="claim">تراجع</button></div>`
+    : `<button class="btn big" data-act="claim">دفعت ${per} ريال ✓</button><p class="hint">حوّل المبلغ أول، بعدين اضغط الزر عشان يوصل للمشرف ويأكده.</p>`) : "";
+  const remindText = `💰 قطة ${D.settings.name}\nتمرين ${longDate(t.date)}\nعلى كل واحد ${per} ريال\n\nباقي ما دفعوا:\n${owed.map((p, i) => `${i + 1}. ${p.name}${status(p.name) === "claimed" ? " (ينتظر تأكيد)" : ""}`).join("\n")}${pay.iban ? `\n\nالآيبان${pay.bank ? " (" + pay.bank + ")" : ""}:\n${pay.iban}` : ""}${pay.stc ? `\nSTC Pay: ${pay.stc}` : ""}${pay.holder ? `\nباسم: ${pay.holder}` : ""}${safeUrl(pay.link) ? `\nرابط الدفع: ${pay.link}` : ""}\n\nبعد التحويل اضغط "دفعت" هنا: ${location.origin + location.pathname}`;
+  const chip = n => { const st = status(n); return admin
+    ? `<button class="paid ${st === "paid" ? "on" : st === "claimed" ? "wait" : ""}" data-act="paid" data-n="${esc(n)}">${st === "paid" ? "دفع ✓" : st === "claimed" ? "يقول دفع · أكّد" : "ما دفع"}</button>`
+    : `<span class="chip ${st === "paid" ? "win" : st === "claimed" ? "gold" : ""}" style="margin-inline-start:auto">${st === "paid" ? "دفع" : st === "claimed" ? "ينتظر تأكيد" : "باقي"}</span>`; };
+  return `<div class="card" id="fee"><div class="row"><h3>💰 القطة</h3>${set ? `<span class="chip blue">${per} ريال على الشخص</span>` : ""}</div>
+    ${admin ? `<form data-form="fee" class="card" style="padding:12px;gap:10px;background:var(--sand)"><div class="role" role="radiogroup"><button type="button" role="radio" data-act="role" data-k="feeMode" data-v="total" aria-checked="${mode !== "per"}">إيجار الملعب كامل</button><button type="button" role="radio" data-act="role" data-k="feeMode" data-v="per" aria-checked="${mode === "per"}">مبلغ على الشخص</button></div>
+      <div class="joinrow"><input id="fee-amount" name="amount" type="number" min="0" inputmode="numeric" placeholder="${mode === "per" ? "كم على كل واحد بالريال" : "إيجار الملعب بالريال"}" value="${(mode === "per" ? f.per : f.total) || ""}"><button class="btn small" type="submit">حفظ</button></div>
+      <p class="hint">${mode === "per" ? "كل واحد من الأساسيين يدفع نفس المبلغ." : `ينقسم على الأساسيين (${people.length} الحين) ويتحدث لو زادوا أو نقصوا.`}</p></form>`
+      : f.mode !== "per" ? `<p class="hint">الإيجار ${f.total} ريال مقسوم على ${people.length} من الأساسيين.</p>` : ""}
+    ${set ? `${payBox}${mine}
+      <div class="row"><span class="label">دفع ${paidN} من ${people.length}${waitN ? ` · ${waitN} ينتظرون تأكيد` : ""}</span>${admin ? `<span class="label">${paidN * per} من ${people.length * per} ريال</span>` : ""}</div>
+      <div class="bar"><i style="width:${people.length ? paidN / people.length * 100 : 0}%"></i></div>
+      <ol class="plain">${people.map(p => `<li>${esc(p.name)}${p.name === U.me ? " (أنت)" : ""}${chip(p.name)}</li>`).join("")}</ol>
+      ${admin && owed.length ? `<a class="btn wa" href="https://wa.me/?text=${encodeURIComponent(remindText)}" target="_blank" rel="noopener">ذكّر اللي ما دفعوا في الواتساب</a>` : ""}` : ""}</div>`;
 }
 
 function spots(n, bottom) {
@@ -596,8 +647,15 @@ function moreView() {
         <label class="f">رمز قروب جديد (اتركه فاضي إذا ما تبي تغيره)<input id="set-group" name="group" autocomplete="off"></label>
         <label class="f">رمز مشرف جديد<input id="set-admin" name="admin" autocomplete="off"></label>
         <div class="btns"><button class="btn small" type="submit">حفظ</button><button class="btn small ghost" type="button" data-act="logoutAdmin">خروج من وضع المشرف</button></div>
-        <p class="hint">إذا غيّرت رمز القروب، الكل يحتاج يدخل الرمز الجديد.</p></form>`
-      : `<form class="card" data-form="admin"><label class="f">دخول المشرف (فتح التمارين، الخانات المحجوزة، التشكيلة، النتائج، الرسوم)<input id="admin-code" name="code" type="password" autocomplete="off"></label><button class="btn small ghost" style="align-self:flex-start" type="submit">دخول</button></form>`}`;
+        <p class="hint">إذا غيّرت رمز القروب، الكل يحتاج يدخل الرمز الجديد.</p></form>
+      <form class="card" data-form="pay"><h3>💰 طريقة دفع القطة</h3><p class="hint">تطلع للشباب في بطاقة القطة مع زر نسخ. عبّ اللي تستخدمه بس.</p>
+        <label class="f">اسم صاحب الحساب<input id="pay-holder" name="holder" value="${esc(payInfo().holder)}" autocomplete="off"></label>
+        <div class="btns"><label class="f">البنك<input id="pay-bank" name="bank" value="${esc(payInfo().bank)}" placeholder="مثلاً: الراجحي" autocomplete="off"></label>
+        <label class="f">رقم STC Pay<input id="pay-stc" name="stc" value="${esc(payInfo().stc)}" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" autocomplete="off"></label></div>
+        <label class="f">الآيبان<input id="pay-iban" name="iban" value="${esc(payInfo().iban)}" dir="ltr" placeholder="SA00 0000 0000 0000 0000 0000" autocomplete="off"></label>
+        <label class="f">رابط دفع (اختياري)<input id="pay-link" name="link" value="${esc(payInfo().link)}" dir="ltr" inputmode="url" placeholder="https://" autocomplete="off"></label>
+        <button class="btn small" style="align-self:flex-start" type="submit">حفظ</button></form>`
+      : `<form class="card" data-form="admin"><label class="f">دخول المشرف (فتح التمارين، الخانات المحجوزة، التشكيلة، النتائج، القطة)<input id="admin-code" name="code" type="password" autocomplete="off"></label><button class="btn small ghost" style="align-self:flex-start" type="submit">دخول</button></form>`}`;
 }
 
 const gateWrap = inner => `<div class="gatewrap">${inner}</div>`;

@@ -205,6 +205,11 @@ ol.plain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;g
 ol.plain li{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--sand);border-radius:12px;font-size:14px}
 ol.plain li .paid{margin-inline-start:auto;border:1px solid var(--line);background:var(--paper);border-radius:99px;font:700 12px var(--f-body);padding:3px 10px;cursor:pointer;color:var(--muted)}
 ol.plain li .paid.on{background:var(--win);border-color:var(--win);color:#fff}
+ol.plain li .paid.wait{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}
+.paybox{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:var(--sky-soft);border:1px solid var(--sky)}
+.payrow{display:flex;align-items:center;gap:8px;min-width:0}
+.payrow .label{flex:none}
+.payrow b{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px;font-variant-numeric:tabular-nums}
 
 /* gate / onboarding */
 .gate{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:14px;padding:28px 22px;background:var(--paper);border:1px solid var(--line);border-radius:24px;text-align:center}
