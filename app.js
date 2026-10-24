@@ -196,6 +196,17 @@ A.size = el => {
   const t = current(), size = +el.dataset.v;
   act(() => store.updateTraining(t.id, t => { t.size = size; }), `صارت ${size} ضد ${size}`);
 };
+// move the selected player into an empty spot on the given team
+A.place = el => {
+  const n = U.sel, T = U.draftTeams, t = current(), side = el.dataset.side;
+  if (!n) return toast("اختر لاعب أول، بعدين اضغط الخانة الفاضية");
+  if ((roleOf(t, n) === "gk") !== Boolean(el.dataset.gk)) return toast(el.dataset.gk ? "خانة الحارس للحراس بس" : "الحارس مكانه عند المرمى");
+  T.A = T.A.filter(x => x !== n); T.B = T.B.filter(x => x !== n);
+  // put them right after the starters already on the pitch so they land on the empty spot, not the bench
+  const team = T[side], { field } = split(t, team), last = field.length ? team.indexOf(field[field.length - 1]) + 1 : team.length;
+  team.splice(roleOf(t, n) === "gk" ? 0 : last, 0, n);
+  U.sel = null; render();
+};
 A.sort = el => { U.sortK = el.dataset.k; render(); };
 
 async function saveMe(name) {
@@ -414,7 +425,7 @@ function pitch(t, T, S, admin) {
     const cap = sizeOf(t) - 1, pos = spots(cap, side === "A");
     const btn = (n, x, y, isGk) => n
       ? `<button class="pl ${side}${isGk ? " gk" : ""}${U.sel === n ? " sel" : ""}" style="right:${x}%;top:${y}%" data-act="pick" data-n="${esc(n)}" ${admin ? "" : "disabled"} title="مستوى ${rating(S, n)}%"><span class="dot">${rating(S, n)}</span><span class="nm">${esc(n)}</span></button>`
-      : `<span class="pl empty${isGk ? " gk" : ""}" style="right:${x}%;top:${y}%"><span class="dot">${isGk ? "🧤" : "+"}</span><span class="nm">${isGk ? "حارس" : "فاضي"}</span></span>`;
+      : `<button class="pl empty${isGk ? " gk" : ""}${U.sel ? " target" : ""}" style="right:${x}%;top:${y}%" data-act="place" data-side="${side}" data-gk="${isGk ? 1 : ""}" ${admin ? "" : "disabled"}><span class="dot">${isGk ? "🧤" : "+"}</span><span class="nm">${isGk ? "حارس" : "فاضي"}</span></button>`;
     const gy = side === "A" ? 92 : 8;
     return btn(gk, 50, gy, true) + Array.from({ length: cap }, (_, i) => btn(field[i], pos[i][0], pos[i][1], false)).join("");
   };
@@ -453,10 +464,13 @@ function lineView() {
     ${stale ? `<p class="hint" style="color:var(--loss)">تغيّرت قائمة الأساسيين بعد حفظ التشكيلة.${admin ? " اضغط توزيع متوازن واحفظها من جديد." : ""}</p>` : ""}
     <div class="balance"><div class="side"><span class="label">🔵 الأزرق · ${T.A.length}</span><b>${avg(T.A)}</b><span class="hint">متوسط المستوى</span></div><span class="vs">ضد</span>
       <div class="side"><span class="label">البيج 🟤 · ${T.B.length}</span><b>${avg(T.B)}</b><span class="hint">متوسط المستوى</span></div></div>
+    ${admin ? (U.sel ? `<div class="mine" style="padding:12px 14px"><span class="num" style="width:40px;height:40px;font-size:16px">👆</span><div class="t"><b>اخترت ${esc(U.sel)}</b>اضغط لاعب ثاني عشان تبدّلهم، أو خانة فاضية عشان تنقله لها.</div></div>`
+        : `<p class="hint" style="background:var(--sky-soft);padding:10px 12px;border-radius:12px;color:var(--ink)">✋ <b>طريقة التحريك:</b> اضغط على أي لاعب (يتلوّن بإطار ذهبي)، بعدها اضغط على لاعب ثاني عشان يتبادلون مكانهم، أو على خانة "فاضي" عشان ينتقل لها. وإذا خلصت اضغط <b>حفظ التشكيلة</b>.</p>`)
+      : `<p class="hint" style="background:var(--sand-2);padding:10px 12px;border-radius:12px">🔒 ترتيب التشكيلة للمشرف. إذا أنت المشرف، ادخل من صفحة <b>المزيد</b> ← <b>دخول المشرف</b> برمزك، وبعدها ترجع هنا وتحرّك اللاعبين.</p>`}
     ${sizeBar(t, admin)}
     ${pitch(t, T, S, admin)}
     ${bench(t, T, admin)}
-    <p class="hint">الرقم داخل الدائرة مستوى اللاعب، والجديد يبدأ من 50. الحارس بإطار ذهبي.${admin ? " اضغط على لاعبين عشان تبدّل مكانهم (بين الفريقين أو بين الملعب والدكة)، وبعدها احفظ." : ""}</p>
+    <p class="hint">الرقم داخل الدائرة مستوى اللاعب، والجديد يبدأ من 50. الحارس بإطار ذهبي.</p>
     <div class="btns">${admin ? `<button class="btn" data-act="saveTeams">حفظ التشكيلة</button>` : ""}
       <a class="btn wa" href="https://wa.me/?text=${encodeURIComponent(teamText)}" target="_blank" rel="noopener">أرسل للواتساب</a>
       <button class="btn ghost" data-act="copy" data-text="${esc(teamText)}">نسخ</button></div>
